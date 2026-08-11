@@ -7,10 +7,15 @@ load_dotenv()
 task_id = str(uuid.uuid4())
 # We give it a task that requires it to write a script that runs without crashing.
 plan = """
-Using the link below of the ollam tunnel create a simple legal chatbot for pakistan law with memroy and history and metrices to evaluate the repsonse of the LLM/chatbot.
-LLM_BASE_URL: str = "https://joke-abilities-assistant-ticket.trycloudflare.com/v1"
-LLM_MODEL: str = "qwen3-coder-next:latest"
+Create a python file called math_utils.py containing a function fibonacci(n) that returns the nth Fibonacci number. 
+First save a naive recursive implementation.
+Then, replace the naive recursive function with an optimized iterative version.
 """
+# plan = """
+# Using the link below of the ollam tunnel create a simple legal chatbot for pakistan law with memroy and history and metrices to evaluate the repsonse of the LLM/chatbot.
+# LLM_BASE_URL: str = "https://joke-abilities-assistant-ticket.trycloudflare.com/v1"
+# LLM_MODEL: str = "qwen3-coder-next:latest"
+# """
 
 controller = CoderController(task_id=task_id, plan_summary=plan)
 

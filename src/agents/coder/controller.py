@@ -1,14 +1,13 @@
 import os
 import json
 from src.sandbox.manager import SandboxManager
-from src.agents.coder.state import CoderState
+from src.agents.coder.state import CoderState, TraceStep
 from src.agents.coder.context import ContextEngine
 from src.agents.coder.harness import Harness
 from src.agents.coder.llm import CoderLLM
 from src.agents.coder.parser import ErrorParser
 from src.core.config import settings
 from src.core.logger import logger
-from src.agents.coder.state import CoderState, TraceStep 
 
 class CoderController:
     """The deterministic orchestration loop for the Coder agent."""
@@ -39,15 +38,12 @@ class CoderController:
                     self.state.latest_error = ErrorParser.parse(str(e), "SYSTEM")
                     break
 
-                # Initialize default tracking values for this iteration
                 verification_success = True
                 step_error = None
 
                 if action.action == "finish":
                     self.log.info("coder_finished_successfully")
                     self.state.status = "SUCCESS"
-                    
-                    # Record the final 'finish' step
                     self.state.execution_trace.append(TraceStep(
                         iteration=self.state.iteration,
                         action_taken=action,
@@ -55,9 +51,14 @@ class CoderController:
                     ))
                     break
                     
-                if action.action in ["write", "edit"]:
+                if action.action in ["write", "edit", "delete"]:
                     self.harness.apply_action(action)
-                    self.state.active_files[action.file_path] = action.content
+                    
+                    # Dynamically sync container changes to the tracking state
+                    if action.action == "delete":
+                        self.state.active_files.pop(action.file_path, None)
+                    else:
+                        self.state.active_files[action.file_path] = self.context.read_file(action.file_path)
                     
                     if action.verify_command and self.harness.validate_command(action.verify_command):
                         self.log.info("verifying_execution", command=action.verify_command)
@@ -72,9 +73,8 @@ class CoderController:
                             step_error = ErrorParser.parse(res.stderr or res.stdout, action.file_path)
                             self.state.latest_error = step_error
                     else:
-                        self.log.warning("no_verify_command_provided")
+                        self.log.warning("no_verify_command_provided_or_invalid")
                 
-                # --- NEW: Append to trace at the end of the iteration ---
                 self.state.execution_trace.append(TraceStep(
                     iteration=self.state.iteration,
                     action_taken=action,
@@ -94,11 +94,9 @@ class CoderController:
             export_path = os.path.join(os.getcwd(), "artifacts", self.state.task_id)
             self.sandbox.export_workspace(export_path)
             
-            # --- NEW: Export the Flight Recorder Trace ---
             trace_file_path = os.path.join(export_path, "execution_trace.json")
             try:
                 with open(trace_file_path, "w") as f:
-                    # Dump the trace list cleanly
                     json.dump(
                         [step.model_dump() for step in self.state.execution_trace], 
                         f, 
@@ -108,6 +106,4 @@ class CoderController:
             except Exception as e:
                 self.log.error("trace_export_failed", error=str(e))
                 
-            # self.sandbox.cleanup()
-            
         return self.state

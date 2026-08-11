@@ -12,7 +12,11 @@ class CoderAction(BaseModel):
     thought: str = Field(description="Briefly explain your reasoning.")
     action: Literal["write", "edit", "delete", "finish"] = Field(description="The operation to perform.")
     file_path: Optional[str] = Field(default="", description="Path to the file.")
-    content: Optional[str] = Field(default="", description="The FULL updated content.")
+
+    content: Optional[str] = Field(default="", description="The FULL updated content. Use ONLY for 'write' actions.")
+    search_block: Optional[str] = Field(default="", description="Exact existing code to replace. Use ONLY for 'edit' actions.")
+    replace_block: Optional[str] = Field(default="", description="New code to insert. Use ONLY for 'edit' actions.")
+
     verify_command: Optional[str] = Field(default="", description="The command to run to verify this change.")
 
 class TraceStep(BaseModel):
@@ -31,5 +35,5 @@ class CoderState(BaseModel):
     latest_error: Optional[StructuredError] = None
     status: Literal["IN_PROGRESS", "SUCCESS", "MAX_ITERATIONS", "FAILED"] = "IN_PROGRESS"
     
-    # --- NEW: Execution Trace ---
+    # --- Execution Trace ---
     execution_trace: List[TraceStep] = Field(default_factory=list)
