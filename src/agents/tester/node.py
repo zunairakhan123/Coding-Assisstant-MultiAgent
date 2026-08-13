@@ -11,10 +11,21 @@ from src.graph.state import GraphState
 from src.agents.tester.parser import TestErrorParser
 
 class TesterOutput(BaseModel):
-    thought: str = Field(description="Your testing strategy.")
-    test_file_path: str = Field(description="Path to write the tests, e.g., 'test_main.py'")
-    test_code: str = Field(description="The complete pytest code.")
-    verify_command: str = Field(description="Command to run the tests, e.g., 'pytest test_main.py'")
+    happy_path_plan: str = Field(
+        description="A detailed list of standard, expected scenarios to test."
+    )
+    edge_case_plan: str = Field(
+        description="A detailed list of boundary conditions, invalid inputs, and exception handling scenarios."
+    )
+    test_file_path: str = Field(
+        description="The path where the tests should be saved (e.g., 'test_main.py')."
+    )
+    test_code: str = Field(
+        description="The full pytest code. Must group tests into TestHappyPath and TestEdgeCases classes."
+    )
+    verify_command: str = Field(
+        description="Command to run the tests, strictly using the module flag (e.g., 'python -m pytest test_main.py -v')."
+    )
 
 class TesterNode:
     def __init__(self, task_id: str):
@@ -40,17 +51,23 @@ class TesterNode:
     def invoke(self, state: GraphState) -> dict:
         self.log.info("starting_tester", test_iteration=state.get("test_iterations", 0))
         
-        # 1. Fetch workspace context & Generate tests
+        # 1. Fetch workspace context
         tree = self.context.get_directory_tree()
         active_files = {f: self.context.read_file(f) for f in tree if f.endswith('.py') or f.endswith('.txt')}
         active_files_str = "\n".join([f"--- {f} ---\n{c}" for f, c in active_files.items()])
 
+        # 2. Generate QA Strategy & Tests
         output: TesterOutput = self.chain.invoke({
             "plan_summary": state["plan_summary"],
             "active_files": active_files_str
         })
         
-        # 2. Inject and Run tests
+        # Log the explicit testing strategies for observability
+        self.log.info("qa_strategy_generated", 
+                      happy_paths=output.happy_path_plan, 
+                      edge_cases=output.edge_case_plan)
+        
+        # 3. Inject and Run tests
         encoded_content = base64.b64encode(output.test_code.encode('utf-8')).decode('utf-8')
         self.sandbox.execute(f"echo '{encoded_content}' | base64 -d > '{output.test_file_path}'")
         self.sandbox.execute("pip install pytest httpx")
@@ -62,12 +79,12 @@ class TesterNode:
         compact_out = raw_out[-2000:] if len(raw_out) > 2000 else raw_out
         self.log.info("tests_completed", exit_code=res.exit_code)
         
-        # 3. EXPORT WORKSPACE (So tests are saved)
+        # 4. EXPORT WORKSPACE 
         import os
         export_path = os.path.join(os.getcwd(), "artifacts", self.task_id)
         self.sandbox.export_workspace(export_path)
 
-        # 4. STATE MUTATION (Moved from the edge router!)
+        # 5. STATE MUTATION 
         current_signature = None
         if res.exit_code != 0:
             signature = TestErrorParser.parse_pytest_output(raw_out)

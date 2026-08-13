@@ -1,0 +1,22 @@
+[
+  {
+    "timestamp": "2026-08-13T05:37:11.184359Z",
+    "task_id": "8802b76d-49e7-44d4-9f72-790b5171d00c",
+    "user_request": "give simple python code to implement a calculator with add and subtract functions",
+    "coder_status": "SUCCESS",
+    "reviewer_status": "PASS",
+    "test_iterations": 1,
+    "replan_count": 0,
+    "artifacts_path": "artifacts/8802b76d-49e7-44d4-9f72-790b5171d00c/"
+  },
+  {
+    "timestamp": "2026-08-13T08:00:59.052380Z",
+    "task_id": "79ad2cbf-6357-4612-bcdc-558eccb4ad87",
+    "user_request": "built a simple fastapi todo app in python ",
+    "coder_status": "FAILED",
+    "reviewer_status": "PASS",
+    "test_iterations": 10,
+    "replan_count": 0,
+    "artifacts_path": "artifacts/79ad2cbf-6357-4612-bcdc-558eccb4ad87/"
+  }
+]

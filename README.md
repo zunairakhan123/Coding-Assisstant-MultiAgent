@@ -1,34 +1,33 @@
 # 🤖 Autonomous Multi-Agent Coding Assistant
 
-**An enterprise-grade, self-healing, multi-agent AI coding framework orchestrated via LangGraph.**
+[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![LangGraph](https://img.shields.io/badge/Orchestration-LangGraph-1C3C3C)](https://www.langchain.com/langgraph)
+[![FastAPI](https://img.shields.io/badge/API-FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Docker](https://img.shields.io/badge/Sandbox-Docker-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-This system autonomously plans, writes, tests, and reviews code within a secure, ephemeral Docker sandbox — using structured error fingerprinting and reflection loops to detect, diagnose, and repair its own bugs without human intervention.
+An enterprise-grade, self-healing, multi-agent AI coding framework orchestrated via **LangGraph** and exposed through a **FastAPI** REST interface.
 
-[![Python](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
-[![LangGraph](https://img.shields.io/badge/orchestration-LangGraph-1c3d5a)](https://langchain-ai.github.io/langgraph/)
-[![Docker](https://img.shields.io/badge/sandbox-Docker-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
-[![License](https://img.shields.io/badge/license-MIT-green)](#-license)
-[![Status](https://img.shields.io/badge/status-active--development-orange)](#-roadmap-upcoming-phases)
+The system autonomously **plans, writes, tests, and reviews code** inside a secure, ephemeral Docker sandbox — using structured error fingerprinting, fuzzy-match code patching, and live end-to-end simulations to detect, diagnose, and repair its own bugs without human intervention.
 
 ---
 
-##  Table of Contents
+## 📑 Table of Contents
 
 - [Overview](#-overview)
-- [System Architecture](#-system-architecture)
+- [System Architecture](#️-system-architecture)
 - [Core Features](#-core-features)
 - [Directory Structure](#-directory-structure)
 - [The Agent Roster](#-the-agent-roster)
-- [Prerequisites](#-prerequisites)
+- [Prerequisites](#️-prerequisites)
 - [Installation](#-installation--setup)
-- [Configuration](#-configuration)
+- [Configuration](#️-configuration)
 - [Usage](#-usage)
 - [Observability & Artifacts](#-observability--artifacts)
-- [Error Fingerprinting](#-error-fingerprinting)
-- [Security Model](#-security-model)
+- [Error Fingerprinting & Patching](#-error-fingerprinting--patching)
+- [Security Model](#️-security-model)
 - [Testing](#-testing)
 - [Troubleshooting](#-troubleshooting)
-- [Roadmap](#-roadmap-upcoming-phases)
 - [Contributing](#-contributing)
 - [License](#-license)
 
@@ -36,113 +35,111 @@ This system autonomously plans, writes, tests, and reviews code within a secure,
 
 ## 🧠 Overview
 
-Traditional single-shot LLM code generation fails silently on non-trivial tasks — it hallucinates imports, produces code that doesn't run, and has no mechanism to verify its own output. This framework solves that by decomposing the coding task into a **team of specialized agents**, each with a narrow responsibility, coordinated by a stateful LangGraph orchestrator with cyclic, conditional routing.
+Traditional single-shot LLM code generation fails silently on non-trivial tasks — it hallucinates imports, produces code that doesn't run, and has no mechanism to verify its own output.
 
-The system runs on two nested control loops:
+This framework solves that by decomposing the coding task into a team of **specialized agents**, each with a narrow responsibility, coordinated by a stateful **LangGraph orchestrator** with cyclic, conditional routing.
+
+The system runs on **two nested control loops**, fully accessible via an asynchronous API:
 
 | Loop | Owner | Purpose |
 |---|---|---|
-| **Global Agentic Loop** | LangGraph | Hands off state between Planner → Coder → Tester → Reviewer, with conditional routing back to earlier nodes on failure |
-| **Deterministic Execution Loop** | Coder Node | A fast, internal loop where the Coder validates its own syntax and runtime execution *before* handing off to the formal Tester node |
+| **Global Agentic Loop** | LangGraph | Hands off state between `Planner → Coder → Tester → Reviewer`, with conditional routing back to earlier nodes on failure. |
+| **Deterministic Execution Loop** | Coder Node | A fast, internal loop where the Coder validates its own syntax and runtime execution before handing off to the formal Tester node. |
 
 This two-tier design keeps cheap, mechanical failures (syntax errors, bad imports) inside the fast inner loop, while reserving the expensive, LLM-driven outer loop for genuine logic or architectural failures.
 
 ---
 
-##  System Architecture
+## 🏗️ System Architecture
 
-```text
-┌───────────────┐      ┌───────────────┐      ┌───────────────┐
-│  1. Planner   │─────▶│   2. Coder    │─────▶│  3. Tester    │
-│ (Architecture)│      │ (Inner Loop)  │      │  (PyTest QA)  │
-└───────────────┘      └──────┬────────┘      └──────┬────────┘
-        ▲                     ▲                       │
-        │                     │   [Tests Failed]      │
-        │  [Replan Trigger]   └───────────────────────┘
-        │                                             │ [Tests Passed]
-        │                                             ▼
-        │                                      ┌───────────────┐
-        │         [Audit Failed]                │ 4. Reviewer   │
-        └────────────────────────────────────── │ (Final Gate)  │
-                                                 └──────┬────────┘
-                                                        │ [Audit Passed]
-                                                        ▼
-                                                 ┌───────────────┐
-                                                 │  5. Cleanup   │
-                                                 │ (Export/Drop) │
-                                                 └───────────────┘
 ```
-
-### Routing Logic
-
-| Trigger | Source Node | Destination | Condition |
-|---|---|---|---|
-| Syntax / import failure | Coder (inner loop) | Coder (self) | Immediate, no LLM re-planning required |
-| Test suite failure | Tester | Coder | Bug is isolated and fixable without redesign |
-| Repeated test failure (same fingerprint) | Tester | Planner | Error signature indicates an architectural flaw (Reflexion) |
-| Audit failure | Reviewer | Planner | Code passes tests but violates DRY/security/requirement constraints |
-| Audit passed | Reviewer | Cleanup | Final export and sandbox teardown |
-
+                                                    
+┌───────────────┐      ┌───────────────┐      ┌──────────────────┐
+│  1. Planner   │─────▶│   2. Coder    │─────▶│  3. Tester      │
+│ (Architecture)│      │ (Inner Loop)  │      │  (PyTest QA)     │
+└───────────────┘      └──────┬────────┘      └──────┬───────────┘
+         ──────────────── ▲   ▲                      │
+        │                     │   [Tests Failed]     │
+        │  [Trigger]          └──────────────────────┘
+        │                                            │ [Tests Passed]
+        │                                            ▼
+        │                                    ┌───────────────┐
+        │         [Audit Failed]             │ 4. Reviewer   │
+        └────────────────────────────────────│ (E2E Gate)    │
+                                             └──────┬────────┘
+                                                    │ [Audit Passed]
+                                                    ▼
+                                             ┌───────────────┐       ┌───────────────┐
+                                             │  5. Cleanup   │──────▶│ Global Ledger │
+                                             │ (Export/Drop) │       └───────────────┘
+                                             └───────────────┘
+```
 
 ---
 
-##  Core Features
+## ✨ Core Features
 
 - **State-Driven Cyclic Routing** — LangGraph conditional edges route tasks dynamically. Repeated test failures trigger a full Reflexion-style replan rather than looping indefinitely on the same broken approach.
+- **SmartPatcher Editing** — A progressive, 3-tier fallback strategy (Exact Match → Normalized Whitespace → Fuzzy Sliding Window) to surgically edit AST nodes and blocks without failing due to minor LLM hallucinations.
+- **Strict Linting & Tech-Debt Prevention** — QA tests dynamically leverage strict warning filters (e.g., `-W error::DeprecationWarning`) to reject deprecated frameworks and force the Coder to use modern syntax.
+- **Live E2E Simulations** — The Reviewer acts as an active QA Engineer, issuing real interactive CLI inputs, `curl` commands, and evaluating expected exit codes (`0` vs `1`) for both happy paths and edge cases.
+- **Harness & Path Validation** — A dedicated strict validation harness sanitizes LLM-generated file paths, intercepting path traversal, hallucinated paths, and command injection attempts before they reach the sandbox
 - **Structured Error Fingerprinting** — Execution logs are normalized (UUIDs, timestamps, and memory addresses scrubbed) into deterministic error signatures, preventing false negatives when line numbers shift and detecting "stuck" conceptual errors across iterations.
+- **Comprehensive Observability** — Every run emits execution_trace.json (low-level LLM thoughts/actions) and workflow_state.json (high-level multi-agent lifecycle metrics), suitable for CI/CD ingestion and post-mortem debugging.
 - **Secure Docker Sandboxing** — All generated code and tests execute inside isolated, ephemeral `python:3.11-slim` containers with stripped privileges to prevent host compromise.
-- **Harness & Path Validation** — A dedicated strict validation harness sanitizes LLM-generated file paths, intercepting path traversal, hallucinated paths, and command injection attempts before they reach the sandbox.
-- **Comprehensive Observability** — Every run emits `execution_trace.json` (low-level LLM thoughts/actions) and `workflow_state.json` (high-level multi-agent lifecycle metrics), suitable for CI/CD ingestion and post-mortem debugging.
 
 ---
 
 ## 📂 Directory Structure
 
-The project follows a modular, domain-driven design, separating the orchestration graph, the Docker sandbox, and individual agent logic.
+The project follows a modular, domain-driven design.
 
-```text
+```
 coding_assistant/
 ├── main.py                 # Main entry point for the LangGraph orchestrator
+├── tasks_ledger.json       # Global database of all executed agentic tasks
 ├── requirements.txt        # Project dependencies
 ├── .env                    # Environment variables (LLM API keys, Docker limits)
-├── artifacts/               # Auto-generated outputs (workspace, traces, state)
+├── artifacts/              # Auto-generated outputs (workspace, traces, state)
 │   └── <task_id>/
 │       ├── workspace/            # Final, passing source code
 │       ├── execution_trace.json  # Step-by-step reasoning and commands
 │       └── workflow_state.json   # Graph iteration counts, error signatures
-├── tests/                  # Framework-level tests (not generated project tests)
 └── src/
-    ├── core/               # System configuration, custom logging, and exceptions
-    ├── sandbox/            # Docker container lifecycle and execution manager
-    ├── graph/              # LangGraph state definitions and cyclic routing logic
+    ├── tests/               ## Framework-level tests (not generated project tests)
+    ├── core/                # System config, logger, ledger, and exceptions
+    │   ├── ledger.py        # Global task recording utility
+    ├── sandbox/             # Docker container lifecycle and execution manager
+    ├── graph/               # LangGraph state definitions and cyclic routing logic
     └── agents/
-        ├── planner/        # Generates architectural blueprints and target files
-        ├── coder/          # Inner-loop coding agent, harness, and context engine
-        ├── tester/         # PyTest generation and error fingerprinting parser
-        └── reviewer/       # Final codebase audit and requirement validation
+        ├── planner/         # Generates architectural blueprints and target files
+        ├── coder/           # Inner-loop coding agent, strict harness, and context
+        ├── tester/          # PyTest generation and edge-case execution
+        └── reviewer/        # Live E2E application simulation and final audit
 ```
 
 ---
 
-##  The Agent Roster
+## 🤖 The Agent Roster
 
 | Agent | Role | Responsibilities |
 |---|---|---|
-| **Planner** | Chief Architect | Analyzes the initial prompt and produces a strict, file-by-file architectural blueprint that downstream agents treat as source of truth |
-| **Coder** | Implementer | Interprets the plan, generates code, and executes it inside the sandbox. Runs a deterministic micro-loop to self-correct `SyntaxError` and `ImportError` instantly, without escalating to the outer graph |
-| **Tester** | QA Engineer | Reads the Coder's workspace, writes a comprehensive PyTest suite, injects it into the container, and extracts structured results |
-| **Reviewer** | Principal Engineer | Audits the final, passing codebase for DRY principles, requirement adherence, and security vulnerabilities before allowing deployment |
+| **Planner** | Chief Architect | Analyzes the initial prompt and produces a strict, file-by-file architectural blueprint that downstream agents treat as source of truth. |
+| **Coder** | Implementer | Interprets the plan, uses the SmartPatcher for surgical edits, and executes rapid micro-loops to self-correct `SyntaxError`s instantly. |
+| **Tester** | QA Automation | Generates robust `pytest` suites explicitly split into Happy Paths and Edge Cases. Mocks inputs to prevent hanging scripts and enforces strict deprecation rules. |
+| **Reviewer** | Principal QA | Bypasses standard execution constraints to simulate human user interaction via shell commands, piped stdin, and `curl`, evaluating code against expected system exit codes. |
 
 ---
-##  Prerequisites
+
+## ⚙️ Prerequisites
 
 - Python 3.10+
 - Docker Engine (running natively — not required to be Docker Desktop, but the daemon must be reachable from the host)
-- A local LLM API (e.g., [Ollama](https://ollama.com/)) or any OpenAI-compatible endpoint
+- A local LLM API (e.g., Ollama) or any OpenAI-compatible endpoint
 
 ---
 
-##  Installation & Setup
+## 🚀 Installation & Setup
 
 **1. Clone the repository**
 
@@ -171,15 +168,13 @@ pip install -r requirements.txt
 docker info
 ```
 
-If this fails, the sandbox manager cannot provision containers — see [Troubleshooting](#-troubleshooting).
-
 ---
 
-##  Configuration
+## 🛠️ Configuration
 
-All runtime configuration is supplied via `.env` in the project root.
+All runtime configuration is supplied via a `.env` file in the project root.
 
-```dotenv
+```env
 # LLM endpoint (local or OpenAI-compatible)
 LLM_BASE_URL="http://localhost:11434/v1"
 LLM_MODEL="qwen2.5-coder:latest"
@@ -192,136 +187,103 @@ SANDBOX_TIMEOUT_SECONDS="120"
 SANDBOX_IMAGE="python:3.11-slim"
 
 # Reflexion / retry ceilings
-MAX_CODER_INNER_LOOP_ITERATIONS="5"
-MAX_TESTER_RETRIES_BEFORE_REPLAN="3"
+MAX_ITERATIONS="5"
 MAX_REPLAN_COUNT="2"
 ```
 
-| Variable | Required | Default | Description |
-|---|---|---|---|
-| `LLM_BASE_URL` | Yes | — | Base URL of the LLM inference endpoint |
-| `LLM_MODEL` | Yes | — | Model identifier passed to the endpoint |
-| `OPENAI_API_KEY` | If using OpenAI-compatible auth | — | API key/token for the endpoint |
-| `SANDBOX_MEM_LIMIT` | No | `512m` | Hard memory ceiling per container |
-| `SANDBOX_CPU_LIMIT` | No | `1.0` | CPU share cap per container |
-| `SANDBOX_TIMEOUT_SECONDS` | No | `120` | Kill switch for hung executions |
-| `MAX_REPLAN_COUNT` | No | `2` | Ceiling on Reviewer/Tester → Planner escalations before the run is marked failed, to prevent infinite Reflexion loops |
+| Variable | Description | Default |
+|---|---|---|
+| `LLM_BASE_URL` | Base URL of the LLM inference endpoint (local or OpenAI-compatible) | `http://localhost:11434/v1` |
+| `LLM_MODEL` | Model identifier used for all agent nodes | `qwen2.5-coder:latest` |
+| `OPENAI_API_KEY` | API key for the configured LLM endpoint | — |
+| `SANDBOX_MEM_LIMIT` | Memory ceiling per Docker sandbox container | `512m` |
+| `SANDBOX_CPU_LIMIT` | CPU core allocation per sandbox container | `1.0` |
+| `SANDBOX_TIMEOUT_SECONDS` | Hard timeout for sandbox execution before force-kill | `120` |
+| `SANDBOX_IMAGE` | Base Docker image used for ephemeral execution | `python:3.11-slim` |
+| `MAX_ITERATIONS` | Max inner-loop self-correction attempts before escalation | `5` |
+| `MAX_REPLAN_COUNT` | Max full Planner replans before a task is marked failed | `2` |
 
 ---
 
-##  Usage
+## 💻 Usage
 
-Execute the LangGraph orchestrator:
+Run the script:
 
 ```bash
-python run.py
+python main.py
 ```
 
-The orchestrator will:
-1. Prompt for a `task_id` and the natural-language coding request
-2. Provision an ephemeral Docker sandbox
-3. Run the Planner → Coder → Tester → Reviewer loop autonomously
-4. Export final artifacts on success, or a failure report if `MAX_REPLAN_COUNT` is exceeded
-
+View task history & ledger in root dir.
 ---
 
-##  Observability & Artifacts
+## 📊 Observability & Artifacts
 
-Once the workflow hits the **Cleanup** node, all assets are exported to `artifacts/<task_id>/`:
+All completed runs populate the central `tasks_ledger.json` file in the project root. Additionally, individual run data is exported to `artifacts/<task_id>/`:
 
 | File / Folder | Contents |
 |---|---|
-| `workspace/` | The final, passing source code |
-| `execution_trace.json` | Complete step-by-step reasoning and commands from the Coder — every LLM call, tool invocation, and sandbox command |
-| `workflow_state.json` | High-level graph iteration counts, error signatures, and Reviewer feedback — designed for CI/CD ingestion and dashboarding |
-
-These artifacts are intended to be consumed by external tooling (CI pipelines, internal dashboards) rather than read manually — `workflow_state.json` in particular is structured for programmatic diffing across runs of the same task.
+| `workspace/` | The final, passing source code generated by the agent. |
+| `execution_trace.json` | Complete step-by-step reasoning — every LLM thought, tool invocation, patch applied, and sandbox error. |
+| `workflow_state.json` | High-level graph iteration counts, final Reviewer feedback, and error signatures. |
 
 ---
 
-##  Error Fingerprinting
+## 🔍 Error Fingerprinting & Patching
 
-Raw stack traces are noisy across runs — memory addresses, UUIDs, and line numbers shift even when the underlying bug is unchanged. The fingerprinting layer normalizes each failure into a stable signature before comparing it against prior attempts:
+**Fingerprinting** — Raw stack traces are normalized (UUIDs, timestamps, and memory addresses scrubbed) into deterministic error signatures. If the same fingerprint recurs across multiple attempts, the graph treats it as a stuck conceptual error and escalates to the Planner for a full architectural overhaul.
 
-```text
-Raw traceback
-   │
-   ▼
-Strip UUIDs, timestamps, memory addresses
-   │
-   ▼
-Normalize file paths and line numbers
-   │
-   ▼
-Hash (exception type + normalized message + call-site shape)
-   │
-   ▼
-Deterministic error fingerprint
-```
-
-If the same fingerprint recurs across `MAX_TESTER_RETRIES_BEFORE_REPLAN` consecutive Coder attempts, the graph treats it as a **stuck conceptual error** rather than a transient bug, and escalates to the Planner for a full architectural overhaul instead of continuing to patch symptoms.
+**SmartPatcher** — Traditional LLM block-replacement fails when the model forgets a newline or alters a docstring. SmartPatcher resolves this via a 3-tier algorithm, ultimately deploying Python's `difflib.SequenceMatcher` to find and patch the closest AST block (>85% similarity) in the target file.
 
 ---
 
-##  Security Model
+## 🛡️ Security Model
 
 | Layer | Control |
 |---|---|
-| **Execution isolation** | All generated code and tests run inside ephemeral `python:3.11-slim` Docker containers, destroyed after each task |
-| **Privilege stripping** | Containers run with reduced Linux capabilities and no access to the host filesystem outside the mounted workspace |
-| **Resource ceilings** | `SANDBOX_MEM_LIMIT`, `SANDBOX_CPU_LIMIT`, and `SANDBOX_TIMEOUT_SECONDS` bound worst-case resource consumption per container |
-| **Path validation** | The harness sanitizes all LLM-generated file paths, rejecting path traversal (`../`) and absolute paths outside the workspace root |
-| **Command injection defense** | LLM-generated shell commands are parsed and allow-listed before execution rather than passed to a shell verbatim |
-| **Network isolation** | Sandboxes should be run with `--network=none` or an isolated bridge network in production to prevent exfiltration or external calls from generated code |
-| **Secrets hygiene** | `.env` is git-ignored; API keys are never passed into the sandbox environment unless explicitly required by the task |
+| **Execution isolation** | All code executes inside ephemeral `python:3.11-slim` Docker containers, forcibly killed by the Cleanup node. |
+| **Harness constraints** | The strict validation harness rejects chained commands (`&&`, `\|`, `;`) to prevent command-injection-style escapes. |
+| **Privilege stripping** |	Containers run with reduced Linux capabilities and no access to the host filesystem outside the mounted workspace |
+|**Resource ceilings** |	SANDBOX_MEM_LIMIT, SANDBOX_CPU_LIMIT, and SANDBOX_TIMEOUT_SECONDS bound worst-case resource consumption per contain |
+| **Path validation** | Rejects path traversal (`../`) and absolute paths outside the workspace root. |
 
-> ⚠️ **Production note:** the sandbox trust boundary assumes the LLM output is adversarial-by-default. Treat any relaxation of path validation or network isolation as a security regression, not a convenience trade-off.
+> ⚠️ **Production note:** The sandbox trust boundary assumes LLM output is adversarial-by-default. Treat any relaxation of path validation or network isolation as a security regression.
 
 ---
 
-##  Testing
+## 🧪 Testing
 
-| Test Layer | Tool | Scope |
-|---|---|---|
-| Framework unit tests | PyTest | `src/` modules — graph routing logic, fingerprinting, harness validation |
-| Generated-code QA | PyTest (dynamically generated by the Tester agent) | Runs *inside* the sandbox against the Coder's output, not part of the framework's own test suite |
-| Sandbox lifecycle tests | PyTest + Docker SDK | Container provisioning, teardown, and resource-limit enforcement |
-
-Run the framework's own test suite:
+Run the framework's own test suite (evaluates the patching logic, harness validation, and state machine):
 
 ```bash
 pytest tests/ -v
 ```
 
+To test the Reviewer Node and Coder Node in isolated sandbox mode without triggering the full multi-agent pipeline, use the included utility:
+
+```bash
+python test_reviewer.py
+python test_controller.py
+```
+
 ---
 
-##  Troubleshooting
+## 🚑 Troubleshooting
 
 | Symptom | Likely Cause | Resolution |
 |---|---|---|
-| `docker.errors.DockerException` on startup | Docker daemon not running or not reachable | Run `docker info`; on Linux ensure your user is in the `docker` group |
-| Coder stuck in inner loop, never reaching Tester | `MAX_CODER_INNER_LOOP_ITERATIONS` too low for task complexity, or LLM repeating the same syntax mistake | Raise the iteration ceiling; inspect `execution_trace.json` for the repeated error pattern |
-| Same bug keeps recurring after a "fix" | Error fingerprint isn't actually changing — normalization may be too aggressive or too weak | Review the fingerprinting rules in `src/agents/tester/`; confirm the signature reflects the real root cause |
-| Graph terminates with "max replans exceeded" | Planner's blueprint is architecturally incompatible with the request | Inspect `workflow_state.json` Reviewer notes from each replan cycle; the request itself may need clarification |
-| Sandbox container hangs indefinitely | Generated code enters an infinite loop or blocking I/O call | Confirm `SANDBOX_TIMEOUT_SECONDS` is set; the sandbox manager should force-kill on timeout |
-| `ImportError` for packages not in `requirements.txt` | LLM hallucinated a dependency, or the sandbox image lacks it | Harness should reject unlisted imports; otherwise extend the base sandbox image's installed packages |
-| LLM endpoint timeouts under load | Local inference endpoint (e.g., Ollama) undersized for concurrent agent calls | Reduce agent concurrency, or point `LLM_BASE_URL` at a higher-throughput endpoint |
-
+| `docker.errors.DockerException` | Docker daemon not reachable | Run `docker info`; on Linux ensure your user is in the `docker` group. |
+| `search_block_not_found` | LLM hallucinated code during an edit action | SmartPatcher typically handles this. If it still fails, the Coder loop catches the exception and forces the LLM to rewrite the block correctly in the next iteration. |
+| Simulation fails with Exit Code `127` | Pathing or shell execution error | Ensure the Reviewer prompt retains the strict instruction to execute commands directly (e.g., `python script.py`) without using `cd /workspace &&`. |
+| Infinite Testing Loop | False-positive warnings causing PyTest failures | Ensure the Tester retains `-W error::DeprecationWarning` rather than `-W error` to prevent third-party library noise from crashing the build. |
+| LLM endpoint timeouts | Inference server overloaded | Reduce concurrency, check tunnels/proxies, or point `LLM_BASE_URL` to a higher-throughput endpoint. |
 ---
 
-##  Roadmap (Upcoming Phases)
-- **Phase 7 — AST/Regex Block Patching**: Upgrade the `CoderAction` schema from full-file overwrites to surgical SEARCH/REPLACE blocks for efficient large-scale codebase modifications.
-- **Phase 8 — Advanced QA Synthesis**: Expand the Tester node to explicitly define and validate Edge Cases and Happy Paths prior to test generation, rather than generating tests reactively.
-- **Phase 9 — Functional Reviewer Simulation**: Enable the Reviewer agent to execute live interactive commands against the running application (`curl`, `bash`, UI interaction) to simulate real human QA rather than static code audit alone.
+## 🤝 Contributing
 
----
-
-## Contributing
-
-Contributions are welcome. Please open an issue describing the proposed change before submitting a pull request for anything beyond a minor fix, since changes to the graph routing logic or sandbox security boundary require design discussion.
+Contributions are welcome. Please open an issue describing the proposed change before submitting a pull request, particularly for anything that alters the graph routing logic or sandbox security boundary.
 
 ---
 
 ## 📄 License
 
-Distributed under the MIT License. See `LICENSE` for details.
+Distributed under the MIT License. See [LICENSE](LICENSE) for details.

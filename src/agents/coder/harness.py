@@ -1,12 +1,73 @@
 import posixpath
 import base64
+import re
+import difflib  # <--- NEW IMPORT
 from pydantic import BaseModel, Field
-from typing import Literal
+from typing import Literal, Tuple
 from src.sandbox.manager import SandboxManager
 from src.core.exceptions import SecurityViolationError
 from src.core.logger import logger
 from src.agents.coder.state import CoderAction
-import re
+
+# --- NEW SMART PATCHER CLASS ---
+class SmartPatcher:
+    """A progressive text patching engine designed for LLM output formatting variations."""
+    FUZZY_THRESHOLD = 0.85
+
+    @staticmethod
+    def _normalize_text(text: str) -> str:
+        if not text:
+            return ""
+        lines = [line.rstrip() for line in text.splitlines()]
+        while lines and not lines[0]:
+            lines.pop(0)
+        while lines and not lines[-1]:
+            lines.pop()
+        return "\n".join(lines)
+
+    @classmethod
+    def apply_patch(cls, original_content: str, search_block: str, replace_block: str) -> Tuple[bool, str]:
+        if not search_block:
+            return False, "Search block is empty."
+
+        # TIER 1: Exact Match
+        if search_block in original_content:
+            return True, original_content.replace(search_block, replace_block, 1)
+
+        # TIER 2: Normalized Whitespace Match
+        norm_orig = cls._normalize_text(original_content)
+        norm_search = cls._normalize_text(search_block)
+        
+        if norm_search in norm_orig:
+            return True, norm_orig.replace(norm_search, replace_block, 1)
+
+        # TIER 3: Fuzzy Sliding Window
+        orig_lines = original_content.splitlines()
+        search_lines = norm_search.splitlines()
+        search_len = len(search_lines)
+        
+        if search_len == 0 or search_len > len(orig_lines):
+            return False, "Search block is larger than the original file."
+
+        best_ratio = 0.0
+        best_idx = -1
+
+        for i in range(len(orig_lines) - search_len + 1):
+            window = "\n".join(orig_lines[i : i + search_len])
+            window_norm = cls._normalize_text(window)
+            ratio = difflib.SequenceMatcher(None, window_norm, norm_search).ratio()
+            if ratio > best_ratio:
+                best_ratio = ratio
+                best_idx = i
+
+        if best_ratio >= cls.FUZZY_THRESHOLD:
+            before = "\n".join(orig_lines[:best_idx])
+            after = "\n".join(orig_lines[best_idx + search_len:])
+            new_content = f"{before}\n{replace_block}\n{after}".strip() + "\n"
+            return True, new_content
+
+        return False, f"Search block not found. Best fuzzy match was only {best_ratio*100:.1f}%. You must copy the exact code block you want to replace."
+# -------------------------------
 
 class Harness:
     """Gatekeeper for state-changing actions. Validates and executes safely."""
@@ -17,13 +78,11 @@ class Harness:
         self.log = logger.bind(component="harness", task_id=sandbox.task_id)
 
     def _is_valid_filename(self, filepath: str) -> bool:
-        """Checks if the filepath contains invalid characters for Windows/Linux."""
         if re.search(r"[\n\r\t<>:\"|?*!]", filepath):
             return False
         return True
 
     def _validate_path(self, filepath: str) -> str:
-        """Ensures the path is valid and cannot traverse outside the workspace."""
         if not self._is_valid_filename(filepath):
             self.log.error("security_violation_filename", attempted_path=filepath)
             raise SecurityViolationError(f"Invalid characters in filename: {filepath}")
@@ -37,7 +96,6 @@ class Harness:
         return posixpath.relpath(clean_path, self.workspace_root)
     
     def apply_action(self, action: CoderAction) -> bool:
-        """Validates and applies the structural change to the sandbox."""
         if action.action == "finish":
             return True
     
@@ -74,12 +132,15 @@ class Harness:
             
             current_content = res.stdout
             
-            if action.search_block not in current_content:
-                self.log.warning("search_block_not_found", search_preview=action.search_block[:50])
-                raise ValueError("The exact `search_block` was not found in the file. You must match indentation and newlines perfectly.")
+            # --- NEW SMART PATCHER LOGIC ---
+            success, result_or_error = SmartPatcher.apply_patch(current_content, action.search_block, action.replace_block)
             
-            new_content = current_content.replace(action.search_block, action.replace_block, 1)
-            encoded_content = base64.b64encode(new_content.encode('utf-8')).decode('utf-8')
+            if not success:
+                self.log.warning("search_block_not_found", error=result_or_error)
+                raise ValueError(result_or_error)
+            
+            encoded_content = base64.b64encode(result_or_error.encode('utf-8')).decode('utf-8')
+            # -------------------------------
             
             res = self.sandbox.execute(f"echo '{encoded_content}' | base64 -d > '{safe_path}'")
             if res.status != "success":
@@ -97,7 +158,6 @@ class Harness:
         return False
 
     def validate_command(self, command: str) -> bool:
-        """Ensures the LLM isn't trying to run malicious commands."""
         if not command:
             return False
             

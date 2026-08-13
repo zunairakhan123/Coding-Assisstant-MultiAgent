@@ -121,16 +121,30 @@ class SandboxManager:
             raise SandboxError(f"Execution failed: {e}")
 
     def cleanup(self):
-        """Forcefully destroys the container."""
-        if self.container:
+        """Forcefully stops and removes the sandbox container."""
+        import docker
+        try:
+            # 1. Actively query Docker for the container by name
+            container_name = f"sandbox_{self.task_id}"
+            container = self.client.containers.get(container_name)
+            
+            self.log.info("stopping_and_removing_sandbox", container_id=container.id[:12])
+            
+            # 2. Stop the container (timeout=1 kills it almost instantly)
+            container.stop(timeout=1)
+            
+            # 3. Force remove it (in case remove=True wasn't set or failed)
             try:
-                self.log.info("cleaning_up_sandbox")
-                self.container.stop(timeout=1)
-                self.log.info("sandbox_destroyed")
-            except DockerException as e:
-                self.log.error("cleanup_failed", error=str(e))
-            finally:
-                self.container = None
+                container.remove(force=True)
+            except Exception:
+                pass # Usually fails harmlessly if remove=True already killed it
+                
+            self.log.info("sandbox_cleaned_up")
+            
+        except docker.errors.NotFound:
+            self.log.info("sandbox_already_removed")
+        except Exception as e:
+            self.log.error("sandbox_cleanup_failed", error=str(e))
                 
     def connect(self):
         """Attaches to an existing running sandbox for this task."""

@@ -52,13 +52,29 @@ class CoderController:
                     break
                     
                 if action.action in ["write", "edit", "delete"]:
-                    self.harness.apply_action(action)
-                    
-                    # Dynamically sync container changes to the tracking state
-                    if action.action == "delete":
-                        self.state.active_files.pop(action.file_path, None)
-                    else:
-                        self.state.active_files[action.file_path] = self.context.read_file(action.file_path)
+                    # --- NEW INNER TRY/EXCEPT BLOCK ---
+                    try:
+                        self.harness.apply_action(action)
+                        
+                        # Dynamically sync container changes to the tracking state
+                        if action.action == "delete":
+                            self.state.active_files.pop(action.file_path, None)
+                        else:
+                            self.state.active_files[action.file_path] = self.context.read_file(action.file_path)
+                            
+                    except Exception as harness_err:
+                        # If the edit/write fails, tell the LLM and skip verification for this round
+                        self.log.warning("harness_action_failed", error=str(harness_err))
+                        self.state.latest_error = ErrorParser.parse(str(harness_err), action.file_path)
+                        
+                        self.state.execution_trace.append(TraceStep(
+                            iteration=self.state.iteration,
+                            action_taken=action,
+                            verification_success=False,
+                            resulting_error=self.state.latest_error
+                        ))
+                        continue # Skip verify_command and go to the next iteration to let the LLM fix it
+                    # ----------------------------------
                     
                     if action.verify_command and self.harness.validate_command(action.verify_command):
                         self.log.info("verifying_execution", command=action.verify_command)

@@ -1,6 +1,7 @@
 import os
 import json
 from langgraph.graph import StateGraph, END
+from src.core.ledger import TaskLedger
 from src.graph.state import GraphState
 from src.agents.planner.llm import PlannerAgent
 from src.agents.coder.controller import CoderController
@@ -68,7 +69,7 @@ def run_reviewer_node(state: GraphState):
     return reviewer.invoke(state)
 
 def run_cleanup_node(state: GraphState):
-    """Saves the Global Workflow State and destroys the sandbox."""
+    """Saves the Global Workflow State, updates the ledger, and destroys the sandbox."""
     logger.info("routing_to_node", node="cleanup", task_id=state["task_id"])
     
     # 1. EXPORT GLOBAL WORKFLOW STATE
@@ -83,7 +84,14 @@ def run_cleanup_node(state: GraphState):
     except Exception as e:
         logger.error("workflow_export_failed", error=str(e))
         
-    # 2. DESTROY SANDBOX
+    # 2. UPDATE GLOBAL TASK LEDGER <--- NEW STEP
+    try:
+        ledger = TaskLedger()
+        ledger.record_task(state)
+    except Exception as e:
+        logger.error("ledger_update_failed", error=str(e))
+        
+    # 3. DESTROY SANDBOX
     sandbox = SandboxManager(state["task_id"])
     sandbox.cleanup()
     return {}
@@ -122,8 +130,8 @@ def route_after_reviewer(state: GraphState) -> str:
             logger.error("max_replans_reached_from_reviewer_aborting")
             return "cleanup"
         else:
-            logger.warning("reviewer_rejected_routing_to_planner")
-            return "planner"
+            logger.warning("reviewer_rejected_routing_to_coder")
+            return "coder"
 
 def build_workflow():
     workflow = StateGraph(GraphState)
@@ -143,10 +151,10 @@ def build_workflow():
         "tester",
         route_after_tester,
         {
-            "coder": "coder",       #loop back to coder if tests fail but plan is okay
-            "planner": "planner",   #loop back to planner if tests fail and plan is flawed
-            "reviewer": "reviewer", # New Reviewer Path
-            "cleanup": "cleanup"  
+            "coder": "coder",       # loop back to coder if tests fail but plan is okay
+            "planner": "planner",   # loop back to planner if tests fail and plan is flawed
+            "reviewer": "reviewer", # New Reviewer Path for passing tests
+            "cleanup": "cleanup"    # CRITICAL: Catches max_retries/fatal exits
         }
     )
     
@@ -155,8 +163,9 @@ def build_workflow():
         "reviewer",
         route_after_reviewer,
         {
-            "planner": "planner",
-            "cleanup": "cleanup"
+            "coder": "coder",       # loop back to coder for minor implementation fixes
+            # "planner": "planner",   # CRITICAL: loop back to planner if architecture is rejected
+            "cleanup": "cleanup"    # Proceed to cleanup if PASS or fatal exit
         }
     )
     
