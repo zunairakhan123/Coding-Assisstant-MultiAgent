@@ -11,7 +11,7 @@ The system autonomously **plans, writes, tests, and reviews code** inside a secu
 
 ---
 
-## 📑 Table of Contents
+##  Table of Contents
 
 - [Overview](#-overview)
 - [System Architecture](#️-system-architecture)
@@ -32,7 +32,7 @@ The system autonomously **plans, writes, tests, and reviews code** inside a secu
 
 ---
 
-## 🧠 Overview
+##  Overview
 
 Traditional single-shot LLM code generation fails silently on non-trivial tasks — it hallucinates imports, produces code that doesn't run, and has no mechanism to verify its own output.
 
@@ -49,7 +49,7 @@ This two-tier design keeps cheap, mechanical failures (syntax errors, bad import
 
 ---
 
-## 🏗️ System Architecture
+##  System Architecture
 
 ```
                                                     
@@ -76,7 +76,7 @@ This two-tier design keeps cheap, mechanical failures (syntax errors, bad import
 
 ---
 
-## ✨ Core Features
+##  Core Features
 
 - **State-Driven Cyclic Routing** — LangGraph conditional edges route tasks dynamically. Repeated test failures trigger a full Reflexion-style replan rather than looping indefinitely on the same broken approach.
 - **SmartPatcher Editing** — A progressive, 3-tier fallback strategy (Exact Match → Normalized Whitespace → Fuzzy Sliding Window) to surgically edit AST nodes and blocks without failing due to minor LLM hallucinations.
@@ -119,7 +119,7 @@ coding_assistant/
 
 ---
 
-## 🤖 The Agent Roster
+##  The Agent Roster
 
 | Agent | Role | Responsibilities |
 |---|---|---|
@@ -138,7 +138,7 @@ coding_assistant/
 
 ---
 
-## 🚀 Installation & Setup
+##  Installation & Setup
 
 **1. Clone the repository**
 
@@ -169,7 +169,7 @@ docker info
 
 ---
 
-## 🛠️ Configuration
+##  Configuration
 
 All runtime configuration is supplied via a `.env` file in the project root.
 
@@ -204,18 +204,17 @@ MAX_REPLAN_COUNT="2"
 
 ---
 
-## 💻 Usage
+##  Usage
 
 Run the script:
 
 ```bash
 python main.py
 ```
-
-View task history & ledger in root dir.
+view task history & ledger in root dir.
 ---
 
-## 📊 Observability & Artifacts
+##  Observability & Artifacts
 
 All completed runs populate the central `tasks_ledger.json` file in the project root. Additionally, individual run data is exported to `artifacts/<task_id>/`:
 
@@ -227,7 +226,7 @@ All completed runs populate the central `tasks_ledger.json` file in the project 
 
 ---
 
-## 🔍 Error Fingerprinting & Patching
+##  Error Fingerprinting & Patching
 
 **Fingerprinting** — Raw stack traces are normalized (UUIDs, timestamps, and memory addresses scrubbed) into deterministic error signatures. If the same fingerprint recurs across multiple attempts, the graph treats it as a stuck conceptual error and escalates to the Planner for a full architectural overhaul.
 
@@ -235,7 +234,7 @@ All completed runs populate the central `tasks_ledger.json` file in the project 
 
 ---
 
-## 🛡️ Security Model
+##  Security Model
 
 | Layer | Control |
 |---|---|
@@ -249,7 +248,7 @@ All completed runs populate the central `tasks_ledger.json` file in the project 
 
 ---
 
-## 🧪 Testing
+##  Testing
 
 Run the framework's own test suite (evaluates the patching logic, harness validation, and state machine):
 
@@ -266,7 +265,7 @@ python test_controller.py
 
 ---
 
-## 🚑 Troubleshooting
+##  Troubleshooting
 
 | Symptom | Likely Cause | Resolution |
 |---|---|---|
@@ -277,12 +276,12 @@ python test_controller.py
 | LLM endpoint timeouts | Inference server overloaded | Reduce concurrency, check tunnels/proxies, or point `LLM_BASE_URL` to a higher-throughput endpoint. |
 ---
 
-## 🤝 Contributing
+##  Contributing
 
 Contributions are welcome. Please open an issue describing the proposed change before submitting a pull request, particularly for anything that alters the graph routing logic or sandbox security boundary.
 
 ---
 
-## 📄 License
+##  License
 
 Distributed under the MIT License. See [LICENSE](LICENSE) for details.
