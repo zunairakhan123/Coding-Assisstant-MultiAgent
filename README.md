@@ -6,7 +6,7 @@
 [![Docker](https://img.shields.io/badge/Sandbox-Docker-2496ED?logo=docker&logoColor=white)](https://www.docker.com/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-An enterprise-grade, self-healing, multi-agent AI coding framework orchestrated via **LangGraph** and exposed through a **FastAPI** REST interface.
+An enterprise-grade, self-healing, multi-agent AI coding framework orchestrated via **LangGraph**
 
 The system autonomously **plans, writes, tests, and reviews code** inside a secure, ephemeral Docker sandbox — using structured error fingerprinting, fuzzy-match code patching, and live end-to-end simulations to detect, diagnose, and repair its own bugs without human intervention.
 

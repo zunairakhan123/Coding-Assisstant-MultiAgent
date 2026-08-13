@@ -7,10 +7,12 @@ load_dotenv()
 
 def main():
     task_id = str(uuid.uuid4())
-    user_request = """Using the link below of the tunnel, create a simple legal chatbot for pakistan law with memory and history and metrics to evaluate the response of the LLM/chatbot.
+    user_request = """Build a simple CLI conversational chatbot in Python that retains chat history (memory) during the execution loop. 
+    Keep the entire implementation contained within a single file named `chatbot.py`.
+    
     LLM_BASE_URL: str = "https://herb-petite-era-glasses.trycloudflare.com/v1"
     LLM_MODEL: str = "qwen3-coder-next:latest"
-    IMP NOTE:Stricty use these credentials and do not use any other LLM or model. 
+    IMP NOTE: Strictly use these credentials via the standard `openai` python package. Do not use any other LLM, framework, or model.
     """
     
     print(f"🚀 Starting Coding Assistant (Task: {task_id})")
